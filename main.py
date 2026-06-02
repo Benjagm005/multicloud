@@ -1,0 +1,55 @@
+import os
+import boto3
+from botocore.exceptions import ClientError
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI()
+
+S3_BUCKET = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name=AWS_REGION
+)
+
+class UploadRequest(BaseModel):
+    filename: str
+    file_type: str
+
+@app.post("/api/upload/presigned-url")
+def get_presigned_url(request: UploadRequest):
+    """
+    Genera una URL firmada para subir un archivo directamente a Amazon S3
+    usando el método HTTP PUT.
+    """
+    object_name = f"uploads/{request.filename}"
+    expiration = 300 
+
+    try:
+        response = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': S3_BUCKET,
+                'Key': object_name,
+                'ContentType': request.file_type
+            },
+            ExpiresIn=expiration
+        )
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
+
+    return {
+        "upload_url": response,
+        "file_key": object_name
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
