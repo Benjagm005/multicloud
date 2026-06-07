@@ -16,6 +16,7 @@ s3_client = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
     region_name=AWS_REGION
 )
 
@@ -49,6 +50,39 @@ def get_presigned_url(request: UploadRequest):
         "upload_url": response,
         "file_key": object_name
     }
+
+@app.get("/api/files")
+def list_files():
+    """
+    Lista todos los archivos dentro de la carpeta 'uploads/' del bucket de S3.
+    """
+    prefix = "uploads/"
+    
+    try:
+        response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET,
+            Prefix=prefix
+        )
+    
+        if "Contents" not in response:
+            return {"files": []}
+
+        files_list = []
+        for item in response["Contents"]:
+            if item["Key"] == prefix:
+                continue
+                
+            files_list.append({
+                "key": item["Key"],
+                "filename": item["Key"].replace(prefix, ""),
+                "size_bytes": item["Size"],
+                "last_modified": item["LastModified"].isoformat()
+            })
+
+        return {"files": files_list}
+
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
