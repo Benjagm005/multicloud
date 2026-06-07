@@ -83,6 +83,19 @@ def list_files():
 
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
+    
+@app.delete("/api/files/{file_key}")
+def delete_file(file_key: str):
+    """
+    Elimina un archivo específico del bucket de S3 usando su clave.
+    """
+    object_key = f"uploads/{file_key}"
+    
+    try:
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=object_key)
+        return {"message": f"Archivo '{file_key}' eliminado exitosamente."}
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
