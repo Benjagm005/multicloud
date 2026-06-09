@@ -35,15 +35,32 @@ s3_client = boto3.client(
 class UploadRequest(BaseModel):
     filename: str
     file_type: str
+    file_size: int
+
+ALLOWED_TYPES = [
+    "application/pdf",
+    "image/jpeg"
+]
+
+MAX_SIZE_BYTES = 12 * 1024 * 1024
 
 @app.post("/api/upload/presigned-url")
 def get_presigned_url(request: UploadRequest):
-    """
-    Genera una URL firmada para subir un archivo directamente a Amazon S3
-    usando el método HTTP PUT.
-    """
+
+    if request.file_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se permiten archivos PDF y JPG."
+        )
+
+    if request.file_size > MAX_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo supera el tamaño máximo permitido de 12 MB."
+        )
+
     object_name = f"uploads/{request.filename}"
-    expiration = 300 
+    expiration = 300
 
     try:
         response = s3_client.generate_presigned_url(
@@ -55,8 +72,12 @@ def get_presigned_url(request: UploadRequest):
             },
             ExpiresIn=expiration
         )
+
     except ClientError as e:
-        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error con AWS: {str(e)}"
+        )
 
     return {
         "upload_url": response,
