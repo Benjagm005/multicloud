@@ -1,4 +1,4 @@
-import { React, useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import api from '../api/axios';
 
@@ -42,6 +42,11 @@ export default function UploadFiles({ onUploadSuccess }) {
         setMessage({ type: '', text: '' });
     };
 
+    const isDuplicateFilename = async (filename) => {
+        const { data } = await api.get('/files');
+        return data.files?.some((fileItem) => fileItem.filename === filename);
+    };
+
     const handleUpload = async (e) => {
         e.preventDefault();
 
@@ -57,6 +62,15 @@ export default function UploadFiles({ onUploadSuccess }) {
         setMessage({ type: '', text: '' });
 
         try {
+            const duplicate = await isDuplicateFilename(file.name);
+            if (duplicate) {
+                setMessage({
+                    type: 'danger',
+                    text: `Ya existe un archivo con el nombre "${file.name}". Cambia el nombre antes de subirlo.`
+                });
+                return;
+            }
+
             const payload = {
                 filename: file.name,
                 file_type: file.type,
@@ -107,26 +121,32 @@ export default function UploadFiles({ onUploadSuccess }) {
             <div className="card-body">
                 <h5 className="card-title fw-bold text-secondary mb-3">Subir nuevo archivo</h5>
 
-                <form onSubmit={handleUpload}>
-                    <div className="row g-3 align-items-center">
-                        <div className="col-12 col-md-9">
-                            <input
-                                type="file"
-                                onChange={handleFileChange}
-                                className="form-control"
-                                disabled={uploading}
-                            />
-                        </div>
-                        <div className="col-12 col-md-3">
-                            <button
-                                type="submit"
-                                disabled={!file || uploading}
-                                className="btn btn-primary w-100 fw-semibold"
-                            >
-                                {uploading ? 'Subiendo...' : 'Subir a S3'}
-                            </button>
+                <form onSubmit={handleUpload} className="upload-form">
+                    <div className="upload-box">
+                        <div className="upload-icon">↑</div>
+                        <div className="upload-copy">
+                            <h2>Arrastra y suelta archivos aquí</h2>
+                            <p>o</p>
+                            <label className="btn btn-outline-primary file-select-button">
+                                Buscar archivos
+                                <input
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    className="file-input"
+                                    disabled={uploading}
+                                />
+                            </label>
+                            {file && <p className="upload-selected">Seleccionado: {file.name}</p>}
                         </div>
                     </div>
+
+                    <button
+                        type="submit"
+                        disabled={!file || uploading}
+                        className="btn btn-primary upload-submit"
+                    >
+                        {uploading ? 'Subiendo...' : 'Subir a S3'}
+                    </button>
                 </form>
 
                 {message.text && (

@@ -11,10 +11,22 @@ function App() {
   }
 
   return (
-    <>
-      <UploadFiles onUploadSuccess={handleRefresh} />
-      <ListFiles refreshTrigger={refreshTrigger} />
-    </>
+    <main className="app-shell">
+      <div className="page-container">
+        <header className="hero">
+          <div>
+            <span className="eyebrow">Gestión de archivos</span>
+            <h1>Multicloud Upload</h1>
+            <p>Sube, lista y elimina archivos PDF o JPG directamente en tu bucket de S3.</p>
+          </div>
+        </header>
+
+        <section className="stacked-sections">
+          <UploadFiles onUploadSuccess={handleRefresh} />
+          <ListFiles refreshTrigger={refreshTrigger} />
+        </section>
+      </div>
+    </main>
   )
 }
 

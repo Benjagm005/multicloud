@@ -49,23 +49,37 @@ export default function ListFiles({ refreshTrigger }) {
         ) : files.length === 0 ? (
           <p>No hay archivos.</p>
         ) : (
-          <ul className="list-group">
-            {files.map((file) => (
-              <li key={file.key} className="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  {file.filename} — {Math.round(file.size_bytes / 1024)} KB — {formatDate(file.last_modified)}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-danger"
-                  onClick={() => handleDelete(file.filename)}
-                  disabled={deletingKey === file.filename}
-                >
-                  {deletingKey === file.filename ? 'Eliminando...' : 'Eliminar'}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="table-responsive">
+            <table className="file-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Peso</th>
+                  <th>Fecha</th>
+                  <th className="text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {files.map((file) => (
+                  <tr key={file.key}>
+                    <td>{file.filename}</td>
+                    <td>{Math.round(file.size_bytes / 1024)} KB</td>
+                    <td>{formatDate(file.last_modified)}</td>
+                    <td className="text-right">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => handleDelete(file.filename)}
+                        disabled={deletingKey === file.filename}
+                      >
+                        {deletingKey === file.filename ? 'Eliminando...' : 'Eliminar'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
