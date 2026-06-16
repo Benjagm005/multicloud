@@ -44,6 +44,11 @@ ALLOWED_TYPES = [
 
 MAX_SIZE_BYTES = 12 * 1024 * 1024
 
+@app.get("/api/health")
+def health_check():
+    return {"status": "Api funcionando correctamente."}
+
+
 @app.post("/api/upload/presigned-url")
 def get_presigned_url(request: UploadRequest):
 
