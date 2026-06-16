@@ -68,6 +68,19 @@ def get_presigned_url(request: UploadRequest):
     expiration = 300
 
     try:
+        s3_client.head_object(Bucket=S3_BUCKET, Key=object_name)
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe un archivo con ese nombre en el bucket."
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "404":
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error con AWS: {str(e)}"
+            )
+
+    try:
         response = s3_client.generate_presigned_url(
             'put_object',
             Params={
