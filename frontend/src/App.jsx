@@ -4,14 +4,16 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 import UploadFiles from './components/UploadFiles';
+import ListFiles from './components/ListFiles';
 
 
 function App() {
   const [count, setCount] = useState(0)
-
+  
   return (
     <>
       <UploadFiles />
+      <ListFiles refreshTrigger={count} />
     </>
   )
 }
