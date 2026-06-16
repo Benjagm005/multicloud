@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
 import UploadFiles from './components/UploadFiles';
 import ListFiles from './components/ListFiles';
 
-
 function App() {
-  const [count, setCount] = useState(0)
-  
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  const handleRefresh = () => {
+    setRefreshTrigger((prev) => prev + 1)
+  }
+
   return (
     <>
-      <UploadFiles />
-      <ListFiles refreshTrigger={count} />
+      <UploadFiles onUploadSuccess={handleRefresh} />
+      <ListFiles refreshTrigger={refreshTrigger} />
     </>
   )
 }
