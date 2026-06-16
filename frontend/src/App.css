@@ -75,6 +75,22 @@ select {
   color: #334155;
 }
 
+.weekly-counter {
+  margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.weekly-counter strong {
+  color: #0369a1;
+}
+
 .stacked-sections {
   display: flex;
   flex-direction: column;

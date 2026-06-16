@@ -1,6 +1,7 @@
 import os
 import boto3
 from botocore.exceptions import ClientError
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -131,6 +132,36 @@ def list_files():
             })
 
         return {"files": files_list}
+
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
+
+@app.get("/api/files/summary")
+def files_summary():
+    prefix = "uploads/"
+    try:
+        response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET,
+            Prefix=prefix
+        )
+
+        if "Contents" not in response:
+            return {"weekly_count": 0}
+
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        weekly_count = 0
+
+        for item in response["Contents"]:
+            if item["Key"] == prefix:
+                continue
+            last_modified = item["LastModified"]
+            if isinstance(last_modified, datetime) and last_modified.tzinfo is None:
+                last_modified = last_modified.replace(tzinfo=timezone.utc)
+            if last_modified >= week_ago:
+                weekly_count += 1
+
+        return {"weekly_count": weekly_count}
 
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
