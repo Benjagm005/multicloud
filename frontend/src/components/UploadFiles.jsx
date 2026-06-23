@@ -87,9 +87,25 @@ export default function UploadFiles({ onUploadSuccess }) {
                 }
             });
 
+            // Confirmar la subida e incrementar el contador semanal en DynamoDB
+            let confirmResult = null;
+            let confirmErrorMessage = '';
+            try {
+                const confirmResponse = await api.post('/files/confirm-upload');
+                confirmResult = confirmResponse.data;
+            } catch (confirmError) {
+                console.warn('Advertencia: No se pudo confirmar la subida en el servidor:', confirmError);
+                confirmErrorMessage =
+                    confirmError.response?.data?.detail ||
+                    confirmError.message ||
+                    'Error desconocido al confirmar el upload.';
+            }
+
             setMessage({
-                type: 'success',
-                text: `El archivo "${file.name}" se subió exitosamente a S3.`
+                type: confirmResult?.success ? 'success' : 'warning',
+                text: confirmResult?.success
+                    ? `El archivo "${file.name}" se subió exitosamente y el contador se actualizó.`
+                    : `El archivo "${file.name}" se subió exitosamente, pero no se pudo actualizar el contador en el servidor. Detalle: ${confirmErrorMessage}`
             });
 
             setFile(null);

@@ -24,6 +24,7 @@ app.add_middleware(
 
 S3_BUCKET = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE", "archivacloud-p05")
 
 s3_client = boto3.client(
     "s3",
@@ -44,6 +45,72 @@ ALLOWED_TYPES = [
 ]
 
 MAX_SIZE_BYTES = 12 * 1024 * 1024
+
+def get_dynamodb_table():
+    """Obtiene la conexión a la tabla DynamoDB."""
+    dynamodb = boto3.resource(
+        'dynamodb',
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
+        region_name=AWS_REGION
+    )
+    return dynamodb.Table(DYNAMODB_TABLE)
+
+
+def get_weekly_counter(semana_inicio: str) -> int:
+    """Obtiene el contador de archivos de DynamoDB para una semana específica."""
+    try:
+        table = get_dynamodb_table()
+        response = table.get_item(
+            Key={
+                'id_tabla': f"semana_{semana_inicio}",
+                'nombre_proyecto': "Contador Semanal S3"
+            }
+        )
+        if 'Item' in response:
+            return response['Item'].get('total_archivos', 0)
+        return 0
+    except Exception as e:
+        print(f"Error obteniendo contador de DynamoDB: {str(e)}")
+        return 0
+
+
+def increment_weekly_counter(semana_inicio: str, cantidad: int = 1) -> int:
+    """Incrementa el contador semanal en DynamoDB. Devuelve el nuevo valor."""
+    try:
+        table = get_dynamodb_table()
+        response = table.update_item(
+            Key={
+                'id_tabla': f"semana_{semana_inicio}",
+                'nombre_proyecto': "Contador Semanal S3"
+            },
+            UpdateExpression="SET descripcion = :desc, semana_inicio = :week, last_updated = :updated ADD total_archivos :inc",
+            ExpressionAttributeValues={
+                ':desc': f"Total de archivos subidos desde el lunes {semana_inicio}: {cantidad}",
+                ':week': semana_inicio,
+                ':updated': datetime.now(timezone.utc).isoformat(),
+                ':inc': cantidad,
+            },
+            ReturnValues='UPDATED_NEW'
+        )
+        nuevo_contador = int(response['Attributes'].get('total_archivos', 0))
+        if response['Attributes'].get('descripcion') != f"Total de archivos subidos desde el lunes {semana_inicio}: {nuevo_contador}":
+            table.update_item(
+                Key={
+                    'id_tabla': f"semana_{semana_inicio}",
+                    'nombre_proyecto': "Contador Semanal S3"
+                },
+                UpdateExpression="SET descripcion = :desc",
+                ExpressionAttributeValues={
+                    ':desc': f"Total de archivos subidos desde el lunes {semana_inicio}: {nuevo_contador}"
+                }
+            )
+        print(f"Contador incrementado a {nuevo_contador} en DynamoDB.")
+        return nuevo_contador
+    except Exception as e:
+        print(f"Error incrementando contador en DynamoDB: {str(e)}")
+        return get_weekly_counter(semana_inicio)
 
 @app.get("/api/health")
 def health_check():
@@ -138,34 +205,60 @@ def list_files():
 
 @app.get("/api/files/summary")
 def files_summary():
-    prefix = "uploads/"
+    """
+    Devuelve el contador semanal almacenado en DynamoDB.
+    No recalcula desde S3 - usa el historial persistente.
+    """
     try:
-        response = s3_client.list_objects_v2(
-            Bucket=S3_BUCKET,
-            Prefix=prefix
-        )
-
-        if "Contents" not in response:
-            return {"weekly_count": 0}
-
+        # Calcular el lunes actual a las 00:00 UTC
         now = datetime.now(timezone.utc)
-        week_ago = now - timedelta(days=7)
-        weekly_count = 0
+        inicio_lunes = now - timedelta(
+            days=now.weekday(), 
+            hours=now.hour, 
+            minutes=now.minute, 
+            seconds=now.second, 
+            microseconds=now.microsecond
+        )
+        semana_inicio_str = inicio_lunes.strftime("%Y-%m-%d")
+        
+        # Obtener el contador de DynamoDB
+        weekly_count = get_weekly_counter(semana_inicio_str)
+        
+        return {
+            "weekly_count": weekly_count,
+            "since_monday": inicio_lunes.isoformat()
+        }
+    except Exception as e:
+        print(f"Error en files_summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-        for item in response["Contents"]:
-            if item["Key"] == prefix:
-                continue
-            last_modified = item["LastModified"]
-            if isinstance(last_modified, datetime) and last_modified.tzinfo is None:
-                last_modified = last_modified.replace(tzinfo=timezone.utc)
-            if last_modified >= week_ago:
-                weekly_count += 1
-
-        return {"weekly_count": weekly_count}
-
-    except ClientError as e:
-        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
-    
+@app.post("/api/files/confirm-upload")
+def confirm_upload():
+    """
+    Incrementa el contador semanal en DynamoDB.
+    Debe ser llamado por el frontend DESPUÉS de subir un archivo exitosamente a S3.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        inicio_lunes = now - timedelta(
+            days=now.weekday(), 
+            hours=now.hour, 
+            minutes=now.minute, 
+            seconds=now.second, 
+            microseconds=now.microsecond
+        )
+        semana_inicio_str = inicio_lunes.strftime("%Y-%m-%d")
+        
+        nuevo_contador = increment_weekly_counter(semana_inicio_str, cantidad=1)
+        
+        return {
+            "success": True,
+            "weekly_count": nuevo_contador,
+            "message": f"Contador incrementado a {nuevo_contador}"
+        }
+    except Exception as e:
+        print(f"Error en confirm_upload: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 @app.delete("/api/files/{file_key}")
 def delete_file(file_key: str):
     """
