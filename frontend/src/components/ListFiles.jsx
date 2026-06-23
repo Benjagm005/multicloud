@@ -34,6 +34,32 @@ export default function ListFiles({ refreshTrigger }) {
       setDeletingKey(null);
     }
   };
+
+  const handleDownload = async (filename) => {
+    try {
+      const { data } = await api.get(`/files/download/${encodeURIComponent(filename)}`);
+      if (data?.download_url) {
+        const response = await fetch(data.download_url);
+        if (!response.ok) {
+          throw new Error('Error al descargar el archivo desde S3.');
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        window.alert('No se pudo generar la URL de descarga.');
+      }
+    } catch (error) {
+      console.error('Error al obtener la URL de descarga:', error);
+      window.alert('No se pudo descargar el archivo. Revisa la consola para más detalles.');
+    }
+  };
   
   const formatDate = (isoString) => isoString.split('T')[0];
   useEffect(() => {
@@ -68,9 +94,17 @@ export default function ListFiles({ refreshTrigger }) {
                     <td className="text-right">
                       <button
                         type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => handleDownload(file.filename)}
+                      >
+                        Descargar
+                      </button>
+                      <button
+                        type="button"
                         className="btn btn-sm btn-outline-danger"
                         onClick={() => handleDelete(file.filename)}
                         disabled={deletingKey === file.filename}
+                        style={{ marginLeft: '0.5rem' }}
                       >
                         {deletingKey === file.filename ? 'Eliminando...' : 'Eliminar'}
                       </button>

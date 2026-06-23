@@ -259,6 +259,28 @@ def confirm_upload():
     except Exception as e:
         print(f"Error en confirm_upload: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.get("/api/files/download/{file_key}")
+def get_download_url(file_key: str):
+    """
+    Genera una URL pre-firmada para descargar un archivo desde S3.
+    """
+    object_key = f"uploads/{file_key}"
+    expiration = 300
+
+    try:
+        response = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET,
+                'Key': object_key,
+            },
+            ExpiresIn=expiration
+        )
+        return {"download_url": response}
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error con AWS: {str(e)}")
+
 @app.delete("/api/files/{file_key}")
 def delete_file(file_key: str):
     """
